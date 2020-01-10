@@ -1,0 +1,59 @@
+show run | include ntp
+show run | include name-server
+show run | include domain
+
+configure terminal
+et-analytics
+ ip flow-export destination 192.168.2.29 2055
+ inactive-timeout 15
+ end
+copy running-config startup-config
+ping 192.168.2.29
+show platform software et-analytics global
+
+configure terminal
+flow record http-flow-record 
+ description HTTP packets between Web Server and Clients
+ match ipv4 protocol
+ match ipv4 source address
+ match ipv4 destination address
+ match transport source-port
+ match transport destination-port
+ collect counter bytes long
+ collect counter packets long
+ collect timestamp absolute first
+ collect timestamp absolute last
+ exit
+flow exporter http-flow-exporter
+ description HTTP Flow Exporter 
+ destination 192.168.2.29
+ transport udp 2055
+ source TenGigabitEthernet 1/1/5
+ template data timeout 30
+ option interface-table
+ option application-table timeout 10
+ exit
+end
+show flow exporter http-flow-exporter
+show running-config flow exporter http-flow-exporter
+
+
+configure terminal
+flow monitor http-flow-monitor
+ description HTTP Flow Monitor
+ exporter http-flow-exporter
+ cache timeout active 60
+ cache timeout inactive 3000
+ record http-flow-record
+ exit
+interface TenGigabitEthernet 1/1/5
+ ip flow monitor  http-flow-monitor input
+ et-analytics enable
+ exit
+end
+copy running-config startup-config
+show flow monitor http-flow-monitor
+show flow monitor http-flow-monitor cache
+show flow monitor http-flow-monitor statistics
+show flow exporter http-flow-exporter statistics
+show platform software et-analytics interfaces
